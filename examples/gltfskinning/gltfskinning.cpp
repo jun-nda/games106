@@ -206,8 +206,8 @@ void VulkanglTFModel::loadSkins(tinygltf::Model &input)
 			    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			    &skins[i].ssbo,
 			    sizeof(glm::mat4) * skins[i].inverseBindMatrices.size(),
-			    skins[i].inverseBindMatrices.data()));
-			VK_CHECK_RESULT(skins[i].ssbo.map());
+			    nullptr));
+			VK_CHECK_RESULT(skins[i].ssbo.map()); // 所以创建了Host-visible内存之后，内存还是device的，所以要map一下，生成一个cpu地址
 		}
 	}
 }
@@ -598,7 +598,6 @@ void VulkanglTFModel::drawNode(VkCommandBuffer commandBuffer, VkPipelineLayout p
 		// Pass the final matrix to the vertex shader using push constants
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &nodeMatrix);
 		// Bind SSBO with skin data for this node to set 1
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &skins[node.skin].descriptorSet, 0, nullptr);
 		for (VulkanglTFModel::Primitive &primitive : node.mesh.primitives)
 		{
 			if (primitive.indexCount > 0)
@@ -625,6 +624,8 @@ void VulkanglTFModel::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipel
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertices.buffer, offsets);
 	vkCmdBindIndexBuffer(commandBuffer, indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 	// Render all nodes at top-level
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &skins[0].descriptorSet, 0, nullptr);
+
 	for (auto &node : nodes)
 	{
 		drawNode(commandBuffer, pipelineLayout, *node);
